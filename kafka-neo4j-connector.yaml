@@ -1,0 +1,75 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kafka-neo4j-connector
+  labels:
+    app: kafka-neo4j-connector
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kafka-neo4j-connector
+  template:
+    metadata:
+      labels:
+        app: kafka-neo4j-connector
+    spec:
+      containers:
+        - name: kafka-neo4j-connector
+          image: veedata/kafka-neo4j-connect:latest2
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8083
+          env:
+          - name: CONNECT_BOOTSTRAP_SERVERS
+            value: "kafka-service:29092"
+          - name: CONNECT_GROUP_ID
+            value: "kafka-connect"
+          - name: CONNECT_KEY_CONVERTER
+            value: "org.apache.kafka.connect.json.JsonConverter"
+          - name: CONNECT_VALUE_CONVERTER
+            value: "org.apache.kafka.connect.json.JsonConverter"
+          - name: CONNECT_VALUE_CONVERTER_SCHEMAS_ENABLE
+            value: "false"
+          - name: CONNECT_OFFSET_STORAGE_TOPIC
+            value: "kafka-neo4j-offsets"
+          - name: CONNECT_CONFIG_STORAGE_TOPIC
+            value: "kafka-neo4j-configs"
+          - name: CONNECT_STATUS_STORAGE_TOPIC
+            value: "kafka-neo4j-status"
+          - name: CONNECT_PLUGIN_PATH
+            value: "/usr/share/confluent-hub-components"
+          - name: NEO4J_URI
+            value: "bolt://neo4j-service:7687"
+          - name: NEO4J_AUTH
+            value: "neo4j/project1phase2"
+          - name: NEO4J_TOPIC_CYPHER_nyc_taxicab_data
+            value: "MERGE (t:Trip {id: event.PULocationID + '-' + event.DOLocationID}) SET t.distance = event.trip_distance, t.fare = event.fare_amount, t.pickup_time = datetime({epochMillis: toInteger(event.tpep_pickup_datetime)}), t.dropoff_time = datetime({epochMillis: toInteger(event.tpep_dropoff_datetime)})"
+          - name: CONNECT_REQUEST_TIMEOUT_MS
+            value: "20000"
+          - name: CONNECT_RETRY_BACKOFF_MS
+            value: "500"
+          - name: CONNECT_CONSUMER_MAX_POLL_INTERVAL_MS
+            value: "300000"
+          - name: NEO4J_HOST
+            value: "neo4j-service:7687"
+          - name: CONNECT_ERRORS_TOLERANCE
+            value: "all"
+          - name: CONNECT_ERRORS_LOG_ENABLE
+            value: "true"
+          - name: CONNECT_ERRORS_LOG_INCLUDE_MESSAGES
+            value: "true"
+          - name: CONNECT_ERRORS_DEADLETTERQUEUE_TOPIC_NAME
+            value: "dlq_neo4j_connector"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kafka-neo4j-connector-service
+spec:
+  selector:
+    app: kafka-neo4j-connector
+  ports:
+  - protocol: TCP
+    port: 8083
+    targetPort: 8083
